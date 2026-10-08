@@ -94,6 +94,8 @@ defmodule AppointmentReferralLink.Pipeline do
     end
   rescue
     e -> {:error, {:exception, Exception.message(e)}}
+  catch
+    kind, value -> {:error, {kind, value}}
   end
 
   defp text(r, a, features, p, c, comps, d) do
@@ -110,35 +112,54 @@ defmodule AppointmentReferralLink.Pipeline do
     end
   end
 
+  # The adapter runs in an unlinked, monitored process: a crash inside it
+  # (including one in a process it links to) becomes an error, never an
+  # exit signal or leftover message in the caller.
   defp call_text(r, a, features, p, c) do
-    task =
-      Task.async(fn ->
-        try do
-          c.text_adapter.refine(r, a, features, p, c)
-        rescue
-          e -> {:error, {:exception, Exception.message(e)}}
-        catch
-          kind, value -> {:error, {kind, value}}
-        end
+    parent = self()
+    ref = make_ref()
+
+    {pid, monitor} =
+      spawn_monitor(fn ->
+        result =
+          try do
+            c.text_adapter.refine(r, a, features, p, c)
+          rescue
+            e -> {:error, {:exception, Exception.message(e)}}
+          catch
+            kind, value -> {:error, {kind, value}}
+          end
+
+        send(parent, {ref, result})
       end)
 
-    case Task.yield(task, c.text_timeout) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {:ok, refined}} when is_float(refined) and refined >= 0.0 and refined <= 1.0 ->
-        {:ok, refined}
+    receive do
+      {^ref, result} ->
+        Process.demonitor(monitor, [:flush])
+        text_result(result)
 
-      {:ok, {:error, reason}} ->
-        {:error, reason}
-
-      {:ok, other} ->
-        {:error, {:bad_return, other}}
-
-      {:exit, reason} ->
+      {:DOWN, ^monitor, :process, ^pid, reason} ->
         {:error, {:exit, reason}}
+    after
+      c.text_timeout ->
+        Process.exit(pid, :kill)
+        Process.demonitor(monitor, [:flush])
 
-      nil ->
+        receive do
+          {^ref, _late} -> :ok
+        after
+          0 -> :ok
+        end
+
         {:error, :timeout}
     end
   end
+
+  defp text_result({:ok, refined}) when is_float(refined) and refined >= 0.0 and refined <= 1.0,
+    do: {:ok, refined}
+
+  defp text_result({:error, reason}), do: {:error, reason}
+  defp text_result(other), do: {:error, {:bad_return, other}}
 
   defp decide(p, c, comps, d),
     do: %{d | outcome: Threshold.outcome(p, c), score: p, reasons: [:score], components: comps}

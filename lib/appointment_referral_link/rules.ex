@@ -15,6 +15,9 @@ defmodule AppointmentReferralLink.Rules do
     else
       {:error, reason} -> {:error, {:ruleset, path, reason}}
     end
+  rescue
+    # rule_match raises on valid JSON of the wrong shape (e.g. "rules": "x").
+    e -> {:error, {:ruleset, path, Exception.message(e)}}
   end
 
   @spec priv(Path.t()) :: Path.t()

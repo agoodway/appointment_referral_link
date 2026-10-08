@@ -58,7 +58,7 @@ defmodule AppointmentReferralLink.Ontology do
   defp read(path) do
     with {:ok, body} <- File.read(path),
          {:ok, %{"format" => 1, "parts" => parts}} when is_map(parts) <- JSON.decode(body),
-         true <- Enum.all?(parts, fn {_, spec} -> is_map(spec) end) do
+         true <- Enum.all?(parts, fn {_, spec} -> valid_spec?(spec) end) do
       {:ok,
        Map.new(parts, fn {name, spec} ->
          {normalize(name),
@@ -69,6 +69,13 @@ defmodule AppointmentReferralLink.Ontology do
       _ -> {:error, :invalid_format}
     end
   end
+
+  defp valid_spec?(spec) when is_map(spec),
+    do: Enum.all?(~w(synonyms children), &strings?(Map.get(spec, &1, [])))
+
+  defp valid_spec?(_spec), do: false
+
+  defp strings?(list), do: is_list(list) and Enum.all?(list, &is_binary/1)
 
   defp terms(spec, key), do: spec |> Map.get(key, []) |> Enum.map(&normalize/1) |> MapSet.new()
 

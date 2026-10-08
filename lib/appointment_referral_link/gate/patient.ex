@@ -1,6 +1,7 @@
 defmodule AppointmentReferralLink.Gate.Patient do
   @moduledoc """
-  Patient gate. `:exact` requires equal, non-nil `patient_id`.
+  Patient gate. `:exact` requires equal, non-blank `patient_id` (nil and
+  `""` never match).
   `{:fellegi_sunter, model}` requires `probability >= fs_link_at` with no
   `patient_matching` guard fired.
   """
@@ -9,7 +10,7 @@ defmodule AppointmentReferralLink.Gate.Patient do
 
   @spec check(Referral.t(), Appointment.t(), Config.t()) :: {:pass | :fail, map() | nil}
   def check(%Referral{patient_id: id}, %Appointment{patient_id: id}, %Config{patient_gate: :exact})
-      when not is_nil(id),
+      when not is_nil(id) and id != "",
       do: {:pass, nil}
 
   def check(_r, _a, %Config{patient_gate: :exact}), do: {:fail, nil}

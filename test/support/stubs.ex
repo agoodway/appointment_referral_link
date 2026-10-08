@@ -76,4 +76,33 @@ defmodule AppointmentReferralLink.Stubs do
     @impl true
     def refine(_r, _a, _f, _p, _c), do: raise("text service down")
   end
+
+  defmodule ThrowingScorer do
+    @moduledoc false
+    @behaviour AppointmentReferralLink.Score
+    @impl true
+    def init(_config), do: {:ok, nil}
+    @impl true
+    def score(_features, _state), do: throw(:boom)
+  end
+
+  defmodule ExitingScorer do
+    @moduledoc false
+    @behaviour AppointmentReferralLink.Score
+    @impl true
+    def init(_config), do: {:ok, nil}
+    @impl true
+    def score(_features, _state), do: exit(:boom)
+  end
+
+  defmodule LinkedCrashText do
+    @moduledoc false
+    @behaviour AppointmentReferralLink.Score.Text
+    @impl true
+    def refine(_r, _a, _f, _p, _c) do
+      spawn_link(fn -> exit(:boom) end)
+      Process.sleep(500)
+      {:ok, 0.99}
+    end
+  end
 end
