@@ -14,9 +14,8 @@ defmodule AppointmentReferralLink.Gate.Conflict do
   @spec default_path() :: Path.t()
   def default_path, do: Rules.priv("priv/rules/conflicts.json")
 
-  @spec load(nil | Path.t() | RuleMatch.Ruleset.t()) ::
-          {:ok, RuleMatch.Ruleset.t()} | {:error, term()}
-  def load(source), do: Rules.load(source, default_path())
+  @spec load(Rules.source(), keyword()) :: {:ok, RuleMatch.Ruleset.t()} | {:error, term()}
+  def load(source, db_opts \\ []), do: Rules.load(source, default_path(), db_opts)
 
   @spec check(map(), RuleMatch.Ruleset.t(), [atom()]) :: {[atom()], [String.t()]}
   def check(features, ruleset, extra_reasons) do

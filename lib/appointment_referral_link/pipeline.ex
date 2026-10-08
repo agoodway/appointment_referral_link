@@ -16,6 +16,7 @@ defmodule AppointmentReferralLink.Pipeline do
     Laterality,
     Ontology,
     Referral,
+    Rules,
     Threshold
   }
 
@@ -23,7 +24,7 @@ defmodule AppointmentReferralLink.Pipeline do
   @spec prepare(Config.t()) :: {:ok, Config.t()} | {:error, term()}
   def prepare(%Config{} = c) do
     with {:ok, ontology} <- Ontology.load([Ontology.default_path() | c.ontology_paths]),
-         {:ok, conflicts} <- Gate.Conflict.load(c.conflict_rules),
+         {:ok, conflicts} <- Gate.Conflict.load(c.conflict_rules, Rules.db_opts(c)),
          {:ok, cpt} <- CptFamilies.load(c.cpt_families || CptFamilies.default_path()),
          {:ok, fs_model} <- load_fs(c.patient_gate),
          {:ok, scorer_state} <- init_scorer(c) do

@@ -2,8 +2,8 @@ defmodule AppointmentReferralLink.Score.Rules do
   @moduledoc """
   Default scorer: a `rule_match` ruleset whose rule outcomes carry
   `weight`, plus `meta.intercept`. Every matching rule's weight is summed
-  and passed through the logistic function. Swap the file with
-  `:score_rules`.
+  and passed through the logistic function. Swap the ruleset with
+  `:score_rules` (a path, a struct, or `{:db, key}`).
   """
 
   @behaviour AppointmentReferralLink.Score
@@ -14,8 +14,8 @@ defmodule AppointmentReferralLink.Score.Rules do
   def default_path, do: Rules.priv("priv/rules/score_weights.json")
 
   @impl true
-  def init(%Config{score_rules: source}) do
-    with {:ok, ruleset} <- Rules.load(source, default_path()) do
+  def init(%Config{score_rules: source} = c) do
+    with {:ok, ruleset} <- Rules.load(source, default_path(), Rules.db_opts(c)) do
       case ruleset.meta do
         %{"intercept" => i} when is_number(i) -> {:ok, %{ruleset: ruleset, intercept: i}}
         _ -> {:error, {:score_rules, "meta.intercept must be a number"}}
