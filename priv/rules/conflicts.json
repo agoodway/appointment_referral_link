@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "name": "conflicts",
+  "version": "2026-10-08",
+  "description": "Hard conflicts. Any matching rule rejects the pair with its outcome reason.",
+  "rules": [
+    {
+      "id": "laterality_conflict",
+      "priority": 10,
+      "conditions": [{"op": "eq", "field": "laterality_match", "value": "conflict"}],
+      "outcome": {"reason": "laterality_conflict"}
+    },
+    {
+      "id": "specialty_mismatch",
+      "priority": 10,
+      "conditions": [{"op": "eq", "field": "specialty_match", "value": "mismatch"}],
+      "outcome": {"reason": "specialty_mismatch"}
+    }
+  ]
+}
