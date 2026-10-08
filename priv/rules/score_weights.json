@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "name": "score_weights",
+  "version": "2026-10-08",
+  "description": "Hand-set conservative weights. p = logistic(intercept + sum of matched weights).",
+  "meta": {"intercept": -4.0},
+  "rules": [
+    {"id": "specialty_exact", "conditions": [{"op": "eq", "field": "specialty_match", "value": "exact"}], "outcome": {"weight": 1.5}},
+    {"id": "specialty_allowed", "conditions": [{"op": "eq", "field": "specialty_match", "value": "allowed"}], "outcome": {"weight": 0.8}},
+    {"id": "body_part_agree", "conditions": [{"op": "in", "field": "body_part_match", "values": ["exact", "related"]}], "outcome": {"weight": 1.5}},
+    {"id": "body_part_mismatch", "conditions": [{"op": "eq", "field": "body_part_match", "value": "mismatch"}], "outcome": {"weight": -2.0}},
+    {"id": "laterality_agree", "conditions": [{"op": "eq", "field": "laterality_match", "value": "agree"}], "outcome": {"weight": 1.0}},
+    {"id": "booked_from_referral", "conditions": [{"op": "eq", "field": "booked_from_referral", "value": true}], "outcome": {"weight": 1.5}},
+    {"id": "icd_overlap", "conditions": [{"op": "gte", "field": "icd_overlap", "value": 1}], "outcome": {"weight": 0.8}},
+    {"id": "near_issue", "conditions": [{"op": "between", "field": "days_from_issue", "from": 0, "to": 30}], "outcome": {"weight": 0.8}},
+    {"id": "late_after_issue", "conditions": [{"op": "gt", "field": "days_from_issue", "value": 60}], "outcome": {"weight": -1.0}}
+  ]
+}
