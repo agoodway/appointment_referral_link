@@ -29,6 +29,9 @@ defmodule AppointmentReferralLink.Rules do
   rescue
     # Database exceptions (repo not started, connection refused, missing table).
     e -> {:error, {:ruleset, key, Exception.message(e)}}
+  catch
+    # DBConnection exits when the pool dies while the caller waits for a connection.
+    :exit, reason -> {:error, {:ruleset, key, Exception.format_exit(reason)}}
   end
 
   def load(path, _default, _db_opts) when is_binary(path) do

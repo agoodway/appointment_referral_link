@@ -2,7 +2,7 @@ defmodule AppointmentReferralLink.DbIntegrationTest do
   use ExUnit.Case, async: false
 
   import AppointmentReferralLink.Fixtures
-  alias AppointmentReferralLink.{PostgresTypes, Score, TestRepo}
+  alias AppointmentReferralLink.{ExitingRepo, PostgresTypes, Score, TestRepo}
   alias RuleMatch.Store
 
   @moduletag :db
@@ -30,7 +30,7 @@ defmodule AppointmentReferralLink.DbIntegrationTest do
     )
 
     TestRepo.query!("TRUNCATE #{@prefix}.rulesets CASCADE")
-    :ok
+    %{url: url}
   end
 
   # Rejects the otherwise-linking fixture pair: laterality agrees for it.
@@ -124,6 +124,21 @@ defmodule AppointmentReferralLink.DbIntegrationTest do
     end)
 
     assert {:ok, [%{outcome: :reject}]} = link(conflict_rules: {:db, key})
+  end
+
+  test "an exit from the pool is an error tuple, not an escaped exit", %{url: url} do
+    start_supervised!({ExitingRepo, url: url, types: PostgresTypes, pool_size: 1, log: false})
+
+    for key <- [:conflict_rules, :score_rules] do
+      assert {:error, {:ruleset, "site_x", msg}} =
+               AppointmentReferralLink.link(referral(), [appointment()], [
+                 {key, {:db, "site_x"}},
+                 ruleset_repo: ExitingRepo,
+                 ruleset_prefix: @prefix
+               ])
+
+      assert msg =~ "pool_gone"
+    end
   end
 
   test "evaluate/2 raises on a missing key" do
