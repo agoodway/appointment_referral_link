@@ -1,18 +1,6 @@
 defmodule AppointmentReferralLink do
   @moduledoc """
-  Documentation for `AppointmentReferralLink`.
+  Links appointments to referrals. Each pair gets `:link`, `:reject`, or
+  `:review`, with structured reasons and a score.
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> AppointmentReferralLink.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 end
