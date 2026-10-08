@@ -1,1 +1,1 @@
-ExUnit.start(exclude: [:ortex])
+ExUnit.start(exclude: [:ortex, :db])

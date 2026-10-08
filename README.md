@@ -45,6 +45,29 @@ Sites extend the data with `ontology_paths:`, `conflict_rules:` (plus
 `conflict_reasons:` for new reason atoms), `score_rules:`, and
 `cpt_families:`.
 
+## Database rulesets
+
+`conflict_rules:` and `score_rules:` also accept `{:db, key}`, loading a
+ruleset stored with rule_match's PostgreSQL tables. The host owns the Repo,
+runs `RuleMatch.Migration` in its own migration, and writes rulesets with
+`RuleMatch.Store`. Point this package at the Repo once, then pick a key per
+call (for example, per site):
+
+```elixir
+config :appointment_referral_link, ruleset_repo: MyApp.Repo   # ruleset_prefix: "rule_match"
+
+AppointmentReferralLink.link(referral, appointments,
+  conflict_rules: {:db, "site_42_conflicts"},
+  score_rules: {:db, "site_42_score_weights"}
+)
+```
+
+Keys are exact and case-sensitive. Rows are read on every call (no cache).
+Failures are returned, never raised: a missing key is
+`{:error, {:ruleset, key, :not_found}}`; there is no fallback to the shipped
+rules. A stored score ruleset needs `meta.intercept`. The host's
+`config :rule_match` settings are not used.
+
 ## Tree model
 
 Train outside Elixir on adjudicated pairs, including hard negatives
@@ -60,4 +83,5 @@ export → train → parity check → threshold → deploy workflow.
 ```sh
 mix test                    # :ortex tests excluded
 mix test --include ortex    # needs test/fixtures/models (scripts/make_test_tree.py)
+mix test --include db       # needs Postgres; ARL_TEST_DATABASE_URL overrides the default URL
 ```
