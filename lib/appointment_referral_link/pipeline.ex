@@ -28,7 +28,14 @@ defmodule AppointmentReferralLink.Pipeline do
          {:ok, fs_model} <- load_fs(c.patient_gate),
          {:ok, scorer_state} <- init_scorer(c) do
       {:ok,
-       %{c | ontology: ontology, conflicts: conflicts, cpt_table: cpt, fs_model: fs_model, scorer_state: scorer_state}}
+       %{
+         c
+         | ontology: ontology,
+           conflicts: conflicts,
+           cpt_table: cpt,
+           fs_model: fs_model,
+           scorer_state: scorer_state
+       }}
     end
   end
 
@@ -116,11 +123,20 @@ defmodule AppointmentReferralLink.Pipeline do
       end)
 
     case Task.yield(task, c.text_timeout) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {:ok, refined}} when is_float(refined) and refined >= 0.0 and refined <= 1.0 -> {:ok, refined}
-      {:ok, {:error, reason}} -> {:error, reason}
-      {:ok, other} -> {:error, {:bad_return, other}}
-      {:exit, reason} -> {:error, {:exit, reason}}
-      nil -> {:error, :timeout}
+      {:ok, {:ok, refined}} when is_float(refined) and refined >= 0.0 and refined <= 1.0 ->
+        {:ok, refined}
+
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:ok, other} ->
+        {:error, {:bad_return, other}}
+
+      {:exit, reason} ->
+        {:error, {:exit, reason}}
+
+      nil ->
+        {:error, :timeout}
     end
   end
 

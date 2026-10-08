@@ -23,13 +23,23 @@ defmodule AppointmentReferralLink.Gate.ConflictTest do
 
   test "specialty mismatch and laterality together", %{features: f, rules: rules} do
     {reasons, _} =
-      Conflict.check(f.(referral(), appointment(laterality: :left, specialty: "cardiology")), rules, [])
+      Conflict.check(
+        f.(referral(), appointment(laterality: :left, specialty: "cardiology")),
+        rules,
+        []
+      )
 
     assert Enum.sort(reasons) == [:laterality_conflict, :specialty_mismatch]
   end
 
   test "missing laterality or specialty is not a conflict", %{features: f, rules: rules} do
-    assert {[], _} = Conflict.check(f.(referral(laterality: nil), appointment(laterality: :left)), rules, [])
+    assert {[], _} =
+             Conflict.check(
+               f.(referral(laterality: nil), appointment(laterality: :left)),
+               rules,
+               []
+             )
+
     assert {[], _} = Conflict.check(f.(referral(), appointment(specialty: nil)), rules, [])
   end
 

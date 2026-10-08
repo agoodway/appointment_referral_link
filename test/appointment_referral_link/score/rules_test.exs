@@ -18,7 +18,9 @@ defmodule AppointmentReferralLink.Score.RulesTest do
   end
 
   test "strongest profile clears link_at", %{state: s, f: f} do
-    assert {:ok, p, %{logit: logit, rules: rules}} = Score.Rules.score(f.(referral(), appointment()), s)
+    assert {:ok, p, %{logit: logit, rules: rules}} =
+             Score.Rules.score(f.(referral(), appointment()), s)
+
     assert_in_delta logit, 3.1, 1.0e-9
     assert p > 0.92
 

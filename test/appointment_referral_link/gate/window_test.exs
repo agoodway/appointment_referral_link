@@ -20,8 +20,14 @@ defmodule AppointmentReferralLink.Gate.WindowTest do
   test "both edges are inclusive", %{c: c} do
     assert Window.check(referral(), appointment(starts_on: ~D[2026-08-25]), c) == []
     assert Window.check(referral(), appointment(starts_on: ~D[2026-12-15]), c) == []
-    assert Window.check(referral(), appointment(starts_on: ~D[2026-08-24]), c) == [:outside_window]
-    assert Window.check(referral(), appointment(starts_on: ~D[2026-12-16]), c) == [:outside_window]
+
+    assert Window.check(referral(), appointment(starts_on: ~D[2026-08-24]), c) == [
+             :outside_window
+           ]
+
+    assert Window.check(referral(), appointment(starts_on: ~D[2026-12-16]), c) == [
+             :outside_window
+           ]
   end
 
   test "nil dates fall outside the window instead of crashing", %{c: c} do
@@ -41,7 +47,9 @@ defmodule AppointmentReferralLink.Gate.WindowTest do
   end
 
   test "linked to a different referral is already_linked", %{c: c} do
-    assert Window.check(referral(), appointment(linked_referral_id: "ref_2"), c) == [:already_linked]
+    assert Window.check(referral(), appointment(linked_referral_id: "ref_2"), c) == [
+             :already_linked
+           ]
   end
 
   test "linked to this same referral is not already_linked", %{c: c} do
@@ -50,6 +58,11 @@ defmodule AppointmentReferralLink.Gate.WindowTest do
 
   test "collects every failing reason", %{c: c} do
     appt = appointment(starts_on: ~D[2027-06-01], status: :no_show, linked_referral_id: "ref_9")
-    assert Window.check(referral(), appt, c) == [:outside_window, :status_excluded, :already_linked]
+
+    assert Window.check(referral(), appt, c) == [
+             :outside_window,
+             :status_excluded,
+             :already_linked
+           ]
   end
 end

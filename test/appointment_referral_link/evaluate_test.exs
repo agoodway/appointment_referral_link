@@ -18,14 +18,27 @@ defmodule AppointmentReferralLink.EvaluateTest do
     assert report.recall == 0.5
     assert report.review_rate == 0.25
     assert report.cross_referral_false_link_rate == 0.5
-    assert report.counts == %{{:link, true} => 1, {:link, false} => 1, {:review, true} => 1, {:reject, false} => 1}
+
+    assert report.counts == %{
+             {:link, true} => 1,
+             {:link, false} => 1,
+             {:review, true} => 1,
+             {:reject, false} => 1
+           }
   end
 
   test "empty and link-free reports" do
-    assert %Report{total: 0, precision: nil, recall: nil, review_rate: nil, cross_referral_false_link_rate: +0.0} =
+    assert %Report{
+             total: 0,
+             precision: nil,
+             recall: nil,
+             review_rate: nil,
+             cross_referral_false_link_rate: +0.0
+           } =
              Report.build([])
 
-    assert %Report{precision: nil, cross_referral_false_link_rate: +0.0} = Report.build([{:reject, true, false}])
+    assert %Report{precision: nil, cross_referral_false_link_rate: +0.0} =
+             Report.build([{:reject, true, false}])
   end
 
   test "evaluate/2 counts a false link to the wrong referral as cross-referral" do
@@ -46,7 +59,12 @@ defmodule AppointmentReferralLink.EvaluateTest do
 
   test "evaluate/2 passes options through and raises on invalid config" do
     labeled = [%{referral: referral(), appointment: appointment(), label: true}]
-    assert %Report{counts: %{{:review, true} => 1}} = AppointmentReferralLink.evaluate(labeled, link_at: 0.99)
-    assert_raise ArgumentError, fn -> AppointmentReferralLink.evaluate(labeled, reject_at: 2.0) end
+
+    assert %Report{counts: %{{:review, true} => 1}} =
+             AppointmentReferralLink.evaluate(labeled, link_at: 0.99)
+
+    assert_raise ArgumentError, fn ->
+      AppointmentReferralLink.evaluate(labeled, reject_at: 2.0)
+    end
   end
 end

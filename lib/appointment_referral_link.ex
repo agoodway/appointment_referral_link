@@ -16,10 +16,12 @@ defmodule AppointmentReferralLink do
   `%Decision{}` per appointment, in input order. Errors are reserved for
   invalid input, invalid config, or unreadable data files.
   """
-  @spec link(Referral.t(), [Appointment.t()], keyword()) :: {:ok, [Decision.t()]} | {:error, term()}
+  @spec link(Referral.t(), [Appointment.t()], keyword()) ::
+          {:ok, [Decision.t()]} | {:error, term()}
   def link(referral, appointments, opts \\ [])
 
-  def link(%Referral{} = referral, appointments, opts) when is_list(appointments) and is_list(opts) do
+  def link(%Referral{} = referral, appointments, opts)
+      when is_list(appointments) and is_list(opts) do
     with :ok <- validate_appointments(appointments),
          {:ok, config} <- Config.build(opts),
          {:ok, config} <- Pipeline.prepare(config) do

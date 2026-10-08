@@ -16,8 +16,10 @@ defmodule AppointmentReferralLink.CptFamilies do
   @spec load(Path.t()) :: {:ok, t()} | {:error, {:cpt_families, Path.t(), term()}}
   def load(path) do
     with {:ok, body} <- File.read(path),
-         {:ok, %{"format" => 1, "families" => families}} when is_map(families) <- JSON.decode(body) do
-      {:ok, %__MODULE__{families: Map.new(families, fn {s, ranges} -> {norm(s), parse(ranges)} end)}}
+         {:ok, %{"format" => 1, "families" => families}} when is_map(families) <-
+           JSON.decode(body) do
+      {:ok,
+       %__MODULE__{families: Map.new(families, fn {s, ranges} -> {norm(s), parse(ranges)} end)}}
     else
       {:error, reason} -> {:error, {:cpt_families, path, reason}}
       _ -> {:error, {:cpt_families, path, :invalid_format}}
@@ -38,10 +40,14 @@ defmodule AppointmentReferralLink.CptFamilies do
     end
   end
 
-  defp parse(ranges), do: Enum.map(ranges, fn [lo, hi] when is_binary(lo) and is_binary(hi) -> {lo, hi} end)
+  defp parse(ranges),
+    do: Enum.map(ranges, fn [lo, hi] when is_binary(lo) and is_binary(hi) -> {lo, hi} end)
 
   defp in_ranges?(code, ranges),
-    do: Enum.any?(ranges, fn {lo, hi} -> byte_size(code) == byte_size(lo) and code >= lo and code <= hi end)
+    do:
+      Enum.any?(ranges, fn {lo, hi} ->
+        byte_size(code) == byte_size(lo) and code >= lo and code <= hi
+      end)
 
   defp norm(s), do: s |> String.trim() |> String.downcase()
 end

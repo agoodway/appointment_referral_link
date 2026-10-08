@@ -61,7 +61,8 @@ defmodule AppointmentReferralLink.Ontology do
          true <- Enum.all?(parts, fn {_, spec} -> is_map(spec) end) do
       {:ok,
        Map.new(parts, fn {name, spec} ->
-         {normalize(name), %{synonyms: terms(spec, "synonyms"), children: terms(spec, "children")}}
+         {normalize(name),
+          %{synonyms: terms(spec, "synonyms"), children: terms(spec, "children")}}
        end)}
     else
       {:error, reason} -> {:error, reason}
@@ -73,7 +74,10 @@ defmodule AppointmentReferralLink.Ontology do
 
   defp merge(acc, parts) do
     Map.merge(acc, parts, fn _name, a, b ->
-      %{synonyms: MapSet.union(a.synonyms, b.synonyms), children: MapSet.union(a.children, b.children)}
+      %{
+        synonyms: MapSet.union(a.synonyms, b.synonyms),
+        children: MapSet.union(a.children, b.children)
+      }
     end)
   end
 

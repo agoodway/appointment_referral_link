@@ -67,7 +67,9 @@ defmodule AppointmentReferralLink.FeaturesTest do
   test "cpt counts codes in the referral specialty's ranges", %{o: o, cpt: cpt} do
     a = appointment(cpt: ["99203", "29881", "93000"])
     assert Features.build(referral(), a, o, cpt).cpt_in_referral_family == 2
-    assert Features.build(referral(specialty: "dermatology"), a, o, cpt).cpt_in_referral_family == nil
+
+    assert Features.build(referral(specialty: "dermatology"), a, o, cpt).cpt_in_referral_family ==
+             nil
   end
 
   test "to_candidate stringifies atoms but keeps booleans, nil and numbers" do

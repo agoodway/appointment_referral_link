@@ -19,7 +19,12 @@ defmodule AppointmentReferralLinkTest do
   end
 
   test "one decision per appointment, in input order" do
-    appts = [appointment(id: "a"), appointment(id: "b", laterality: :left), appointment(id: "c", patient_id: "x")]
+    appts = [
+      appointment(id: "a"),
+      appointment(id: "b", laterality: :left),
+      appointment(id: "c", patient_id: "x")
+    ]
+
     {:ok, decisions} = AppointmentReferralLink.link(referral(), appts)
 
     assert Enum.map(decisions, &{&1.appointment_id, &1.outcome, &1.reasons}) == [
@@ -37,7 +42,9 @@ defmodule AppointmentReferralLinkTest do
   end
 
   test "laterality filled from reason text triggers the conflict gate" do
-    {:ok, [d]} = AppointmentReferralLink.link(referral(), [appointment(laterality: nil, reason: "lt knee")])
+    {:ok, [d]} =
+      AppointmentReferralLink.link(referral(), [appointment(laterality: nil, reason: "lt knee")])
+
     assert d.reasons == [:laterality_conflict]
     assert d.components.features.laterality_match == :conflict
   end
@@ -52,15 +59,22 @@ defmodule AppointmentReferralLinkTest do
   end
 
   test "invalid config and missing data files are errors" do
-    assert {:error, {:invalid_config, _}} = AppointmentReferralLink.link(referral(), [], reject_at: 0.99)
-    assert {:error, {:ruleset, _, _}} = AppointmentReferralLink.link(referral(), [], conflict_rules: "/nope.json")
-    assert {:error, {:ontology, _, _}} = AppointmentReferralLink.link(referral(), [], ontology_paths: ["/nope.json"])
+    assert {:error, {:invalid_config, _}} =
+             AppointmentReferralLink.link(referral(), [], reject_at: 0.99)
+
+    assert {:error, {:ruleset, _, _}} =
+             AppointmentReferralLink.link(referral(), [], conflict_rules: "/nope.json")
+
+    assert {:error, {:ontology, _, _}} =
+             AppointmentReferralLink.link(referral(), [], ontology_paths: ["/nope.json"])
   end
 
   describe "scorer failures go to review, never link" do
     for scorer <- [Stubs.RaisingScorer, Stubs.BadScorer, Stubs.IntScorer] do
       test "#{inspect(scorer)}" do
-        {:ok, [d]} = AppointmentReferralLink.link(referral(), [appointment()], scorer: unquote(scorer))
+        {:ok, [d]} =
+          AppointmentReferralLink.link(referral(), [appointment()], scorer: unquote(scorer))
+
         assert d.outcome == :review
         assert d.reasons == [:scorer_error]
         assert d.score == nil
@@ -70,7 +84,9 @@ defmodule AppointmentReferralLinkTest do
 
   describe "text adapter" do
     test "is skipped outside the band" do
-      {:ok, [d]} = AppointmentReferralLink.link(referral(), [appointment()], text_adapter: Stubs.LowText)
+      {:ok, [d]} =
+        AppointmentReferralLink.link(referral(), [appointment()], text_adapter: Stubs.LowText)
+
       assert d.outcome == :link
       refute Map.has_key?(d.components, :text)
     end

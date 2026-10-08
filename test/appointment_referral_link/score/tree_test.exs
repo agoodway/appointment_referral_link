@@ -34,7 +34,9 @@ defmodule AppointmentReferralLink.Score.TreeTest do
   test "rejects unknown column names", %{tmp_dir: dir} do
     path = Path.join(dir, "cols.json")
     File.write!(path, ~s({"format": 1, "columns": [{"name": "days_from_issu"}]}))
-    assert {:error, {:tree_columns, ^path, {:unknown_feature, "days_from_issu"}}} = Encoder.load(path)
+
+    assert {:error, {:tree_columns, ^path, {:unknown_feature, "days_from_issu"}}} =
+             Encoder.load(path)
   end
 
   @tag :ortex
@@ -46,10 +48,15 @@ defmodule AppointmentReferralLink.Score.TreeTest do
       )
 
     {:ok, state} = AppointmentReferralLink.Score.Tree.init(c)
-    {:ok, booked, _} = AppointmentReferralLink.Score.Tree.score(f.(referral(), appointment()), state)
+
+    {:ok, booked, _} =
+      AppointmentReferralLink.Score.Tree.score(f.(referral(), appointment()), state)
 
     {:ok, unbooked, _} =
-      AppointmentReferralLink.Score.Tree.score(f.(referral(), appointment(booked_from_referral: false)), state)
+      AppointmentReferralLink.Score.Tree.score(
+        f.(referral(), appointment(booked_from_referral: false)),
+        state
+      )
 
     assert booked >= 0.0 and booked <= 1.0
     assert booked > unbooked
@@ -65,7 +72,13 @@ defmodule AppointmentReferralLink.Score.TreeTest do
 
   @tag :ortex
   test "a missing model is an init error" do
-    {:ok, c} = Config.build(tree_model_path: "/nope/linker.onnx", tree_columns_path: Path.join(@models, "linker.features.json"))
-    assert {:error, {:tree_model, "/nope/linker.onnx", _}} = AppointmentReferralLink.Score.Tree.init(c)
+    {:ok, c} =
+      Config.build(
+        tree_model_path: "/nope/linker.onnx",
+        tree_columns_path: Path.join(@models, "linker.features.json")
+      )
+
+    assert {:error, {:tree_model, "/nope/linker.onnx", _}} =
+             AppointmentReferralLink.Score.Tree.init(c)
   end
 end

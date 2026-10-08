@@ -17,7 +17,9 @@ if Code.ensure_loaded?(Ortex) do
     @impl true
     def init(%Config{} = c) do
       model_path = c.tree_model_path || Rules.priv("priv/models/linker.onnx")
-      columns_path = c.tree_columns_path || Path.join(Path.dirname(model_path), "linker.features.json")
+
+      columns_path =
+        c.tree_columns_path || Path.join(Path.dirname(model_path), "linker.features.json")
 
       with {:ok, columns} <- Encoder.load(columns_path),
            {:ok, model} <- model(model_path) do

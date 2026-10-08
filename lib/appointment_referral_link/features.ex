@@ -92,7 +92,10 @@ defmodule AppointmentReferralLink.Features do
   end
 
   defp categories(codes),
-    do: codes |> Enum.map(&(&1 |> String.trim() |> String.upcase() |> String.slice(0, 3))) |> MapSet.new()
+    do:
+      codes
+      |> Enum.map(&(&1 |> String.trim() |> String.upcase() |> String.slice(0, 3)))
+      |> MapSet.new()
 
   defp same(nil, _), do: nil
   defp same(_, nil), do: nil
