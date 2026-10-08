@@ -27,6 +27,7 @@ defmodule AppointmentReferralLink.MixProject do
     [
       {:rule_match, github: "agoodway/rule_match"},
       {:patient_matching, github: "agoodway/patient_matching"},
+      {:ortex, "~> 0.1.10", optional: true},
       {:stream_data, "~> 1.1", only: :test}
     ]
   end

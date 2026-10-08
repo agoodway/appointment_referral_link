@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "columns": [
+    {
+      "name": "days_from_issue"
+    },
+    {
+      "name": "booked_from_referral"
+    },
+    {
+      "name": "icd_overlap"
+    },
+    {
+      "name": "laterality_match",
+      "one_hot": [
+        "agree",
+        "conflict",
+        "unknown"
+      ]
+    }
+  ]
+}
