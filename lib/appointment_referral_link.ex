@@ -9,7 +9,7 @@ defmodule AppointmentReferralLink do
   See `AppointmentReferralLink.Config` for options.
   """
 
-  alias AppointmentReferralLink.{Appointment, Config, Decision, Pipeline, Referral}
+  alias AppointmentReferralLink.{Appointment, Config, Decision, Pipeline, Referral, Report}
 
   @doc """
   Decides every appointment against one referral. Returns one
@@ -29,6 +29,38 @@ defmodule AppointmentReferralLink do
 
   def link(_referral, _appointments, _opts),
     do: {:error, {:invalid_input, "expected a %Referral{} and a list of %Appointment{}"}}
+
+  @doc """
+  Runs labeled pairs (`%{referral:, appointment:, label: boolean}`)
+  through the pipeline with one prepared config and reports precision,
+  recall, review rate, and the cross-referral false-link rate. A false
+  link is cross-referral when the same appointment is labeled true for a
+  different referral in the set. Raises `ArgumentError` on invalid config.
+  """
+  @spec evaluate([map()], keyword()) :: Report.t()
+  def evaluate(labeled, opts \\ []) when is_list(labeled) do
+    config =
+      with {:ok, config} <- Config.build(opts),
+           {:ok, config} <- Pipeline.prepare(config) do
+        config
+      else
+        {:error, reason} -> raise ArgumentError, "evaluate/2: #{inspect(reason)}"
+      end
+
+    truth =
+      for %{label: true, referral: r, appointment: a} <- labeled, reduce: %{} do
+        acc -> Map.update(acc, a.id, MapSet.new([r.id]), &MapSet.put(&1, r.id))
+      end
+
+    labeled
+    |> Enum.map(fn %{referral: r, appointment: a, label: label} ->
+      decision = Pipeline.run(r, a, config)
+      owners = Map.get(truth, a.id, MapSet.new())
+      cross? = decision.outcome == :link and not label and Enum.any?(owners, &(&1 != r.id))
+      {decision.outcome, label, cross?}
+    end)
+    |> Report.build()
+  end
 
   defp validate_appointments(appointments) do
     case Enum.find_index(appointments, &(not match?(%Appointment{}, &1))) do
