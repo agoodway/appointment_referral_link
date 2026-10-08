@@ -83,4 +83,72 @@ defmodule AppointmentReferralLink.ConfigTest do
                )
     end
   end
+
+  describe "ruleset sources" do
+    test "repo defaults to nil and prefix to rule_match" do
+      assert {:ok, c} = Config.build([])
+      assert c.ruleset_repo == nil
+      assert c.ruleset_prefix == "rule_match"
+    end
+
+    test "nil, a path, a struct, and {:db, key} with a repo are accepted" do
+      {:ok, ruleset} = RuleMatch.Ruleset.from_json(~s({"format": 1, "rules": []}))
+
+      assert {:ok, _} = Config.build(conflict_rules: nil, score_rules: "w.json")
+      assert {:ok, _} = Config.build(conflict_rules: ruleset)
+
+      assert {:ok, c} =
+               Config.build(
+                 conflict_rules: {:db, "site_a_conflicts"},
+                 score_rules: {:db, "site_a_score_weights"},
+                 ruleset_repo: Enum,
+                 ruleset_prefix: "rules"
+               )
+
+      assert c.conflict_rules == {:db, "site_a_conflicts"}
+      assert c.ruleset_prefix == "rules"
+    end
+
+    test "keys are not trimmed or downcased" do
+      assert {:ok, %{conflict_rules: {:db, " Site_A "}}} =
+               Config.build(conflict_rules: {:db, " Site_A "}, ruleset_repo: Enum)
+    end
+
+    for key <- ["", "   ", :site_a, nil, 42] do
+      test "rejects {:db, #{inspect(key)}}" do
+        assert {:error, {:invalid_config, msg}} =
+                 Config.build(conflict_rules: {:db, unquote(key)}, ruleset_repo: Enum)
+
+        assert msg =~ "conflict_rules"
+      end
+    end
+
+    for source <- [:file, 42, {:file, "x.json"}, {:db}, {:db, "k", []}] do
+      test "rejects source #{inspect(source)}" do
+        assert {:error, {:invalid_config, _}} =
+                 Config.build(score_rules: unquote(Macro.escape(source)))
+      end
+    end
+
+    test "a database source requires a loaded repo module" do
+      assert {:error, {:invalid_config, msg}} = Config.build(conflict_rules: {:db, "k"})
+      assert msg =~ "ruleset_repo"
+
+      assert {:error, {:invalid_config, _}} =
+               Config.build(score_rules: {:db, "k"}, ruleset_repo: NoSuchRepo)
+
+      assert {:error, {:invalid_config, _}} =
+               Config.build(score_rules: {:db, "k"}, ruleset_repo: "MyApp.Repo")
+    end
+
+    test "the repo is not checked when no source uses the database" do
+      assert {:ok, _} = Config.build(ruleset_repo: NoSuchRepo)
+    end
+
+    test "rejects a blank or non-string prefix" do
+      assert {:error, {:invalid_config, msg}} = Config.build(ruleset_prefix: " ")
+      assert msg =~ "ruleset_prefix"
+      assert {:error, {:invalid_config, _}} = Config.build(ruleset_prefix: :rules)
+    end
+  end
 end

@@ -3,6 +3,7 @@ defmodule AppointmentReferralLink.Config do
   Runtime configuration. Defaults, then `config :appointment_referral_link`,
   then per-call options. `Pipeline.prepare/1` fills the runtime fields
   (`ontology`, `conflicts`, `cpt_table`, `scorer_state`, `fs_model`).
+  `ruleset_repo` and `ruleset_prefix` locate `{:db, key}` ruleset sources.
   """
 
   @defaults [
@@ -22,6 +23,8 @@ defmodule AppointmentReferralLink.Config do
     ontology_paths: [],
     conflict_rules: nil,
     score_rules: nil,
+    ruleset_repo: nil,
+    ruleset_prefix: "rule_match",
     conflict_reasons: [],
     cpt_families: nil,
     tree_model_path: nil,
@@ -95,6 +98,20 @@ defmodule AppointmentReferralLink.Config do
       not (is_list(c.ontology_paths) and Enum.all?(c.ontology_paths, &is_binary/1)) ->
         error("ontology_paths must be a list of file paths")
 
+      not valid_source?(c.conflict_rules) ->
+        error(source_message(:conflict_rules))
+
+      not valid_source?(c.score_rules) ->
+        error(source_message(:score_rules))
+
+      not (is_binary(c.ruleset_prefix) and String.trim(c.ruleset_prefix) != "") ->
+        error("ruleset_prefix must be a nonblank string")
+
+      uses_db?(c) and not loaded_module?(c.ruleset_repo) ->
+        error(
+          "ruleset_repo must be a loaded Ecto Repo module when a ruleset source is {:db, key}"
+        )
+
       true ->
         {:ok, c}
     end
@@ -102,6 +119,20 @@ defmodule AppointmentReferralLink.Config do
 
   defp prob?(x), do: is_number(x) and x >= 0 and x <= 1
   defp non_neg_int?(x), do: is_integer(x) and x >= 0
+
+  defp valid_source?(nil), do: true
+  defp valid_source?(path) when is_binary(path), do: true
+  defp valid_source?(%RuleMatch.Ruleset{}), do: true
+  defp valid_source?({:db, key}) when is_binary(key), do: String.trim(key) != ""
+  defp valid_source?(_), do: false
+
+  defp source_message(key),
+    do:
+      "#{key} must be nil, a file path, a %RuleMatch.Ruleset{}, or {:db, key} with a nonblank string key"
+
+  defp uses_db?(c), do: Enum.any?([c.conflict_rules, c.score_rules], &match?({:db, _}, &1))
+
+  defp loaded_module?(m), do: is_atom(m) and not is_nil(m) and Code.ensure_loaded?(m)
 
   defp implements?(module, functions) when is_atom(module) and not is_nil(module) do
     Code.ensure_loaded?(module) and
