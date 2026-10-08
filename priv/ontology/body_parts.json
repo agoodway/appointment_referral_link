@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "parts": {
+    "knee": {
+      "synonyms": ["knee joint", "knees"],
+      "children": ["medial knee", "lateral knee", "patella", "kneecap", "acl", "pcl", "mcl", "lcl", "meniscus", "medial meniscus", "lateral meniscus"]
+    },
+    "shoulder": {
+      "synonyms": ["shoulder joint", "shoulders"],
+      "children": ["rotator cuff", "ac joint", "acromioclavicular joint", "glenohumeral joint", "labrum"]
+    },
+    "hip": {
+      "synonyms": ["hip joint", "hips"],
+      "children": ["groin", "acetabulum", "greater trochanter", "hip labrum"]
+    },
+    "ankle": {
+      "synonyms": ["ankle joint", "ankles"],
+      "children": ["achilles", "achilles tendon", "lateral ankle", "medial ankle"]
+    },
+    "foot": {
+      "synonyms": ["feet"],
+      "children": ["heel", "plantar fascia", "toe", "great toe", "forefoot", "midfoot", "hindfoot"]
+    },
+    "wrist": {
+      "synonyms": ["wrists"],
+      "children": ["carpal tunnel", "scaphoid", "tfcc"]
+    },
+    "hand": {
+      "synonyms": ["hands"],
+      "children": ["finger", "thumb", "palm", "metacarpal"]
+    },
+    "elbow": {
+      "synonyms": ["elbows"],
+      "children": ["lateral epicondyle", "medial epicondyle", "olecranon"]
+    },
+    "spine": {
+      "synonyms": ["back"],
+      "children": ["lumbar spine", "low back", "lower back", "cervical spine", "neck", "thoracic spine", "sacrum"]
+    }
+  }
+}
