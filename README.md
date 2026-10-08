@@ -49,10 +49,11 @@ Sites extend the data with `ontology_paths:`, `conflict_rules:` (plus
 
 Train outside Elixir on adjudicated pairs, including hard negatives
 (same patient, same body part or specialty, nearby date, different
-referral). Export with `skl2onnx` (`zipmap: False`) to
-`priv/models/linker.onnx`, and put `linker.features.json` next to it to
+referral), then export to ONNX with `linker.features.json` next to it to
 give the column order. Add `{:ortex, "~> 0.1.10"}` to your app and set
-`scorer: AppointmentReferralLink.Score.Tree`.
+`scorer: AppointmentReferralLink.Score.Tree`. See
+[docs/training-tree-model.md](docs/training-tree-model.md) for the full
+export → train → parity check → threshold → deploy workflow.
 
 ## Tests
 
