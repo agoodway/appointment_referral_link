@@ -81,4 +81,26 @@ defmodule AppointmentReferralLink.Score.TreeTest do
     assert {:error, {:tree_model, "/nope/linker.onnx", _}} =
              AppointmentReferralLink.Score.Tree.init(c)
   end
+
+  @tag :ortex
+  @tag :tmp_dir
+  test "a model replaced at the same path is reloaded, not served from cache", %{
+    tmp_dir: dir,
+    f: f
+  } do
+    model = Path.join(dir, "linker.onnx")
+    File.cp!(Path.join(@models, "linker.onnx"), model)
+    File.cp!(Path.join(@models, "linker.features.json"), Path.join(dir, "linker.features.json"))
+
+    {:ok, c} = Config.build(tree_model_path: model)
+    assert {:ok, state} = AppointmentReferralLink.Score.Tree.init(c)
+
+    assert {:ok, _, _} =
+             AppointmentReferralLink.Score.Tree.score(f.(referral(), appointment()), state)
+
+    File.write!(model, "not an onnx model")
+    File.touch!(model, System.os_time(:second) + 10)
+
+    assert {:error, {:tree_model, ^model, _}} = AppointmentReferralLink.Score.Tree.init(c)
+  end
 end

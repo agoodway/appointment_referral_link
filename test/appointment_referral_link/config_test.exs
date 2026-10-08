@@ -56,4 +56,31 @@ defmodule AppointmentReferralLink.ConfigTest do
   test "rejects non-atom conflict reasons" do
     assert {:error, {:invalid_config, _}} = Config.build(conflict_reasons: ["x"])
   end
+
+  describe "module and path options are type-checked" do
+    test "scorer must be a module implementing the scorer behaviour" do
+      assert {:error, {:invalid_config, _}} = Config.build(scorer: "x")
+      assert {:error, {:invalid_config, _}} = Config.build(scorer: Enum)
+      assert {:error, {:invalid_config, _}} = Config.build(scorer: NoSuchModule)
+    end
+
+    test "text_adapter must be a module implementing refine/5" do
+      assert {:error, {:invalid_config, _}} = Config.build(text_adapter: nil)
+      assert {:error, {:invalid_config, _}} = Config.build(text_adapter: Enum)
+    end
+
+    test "ontology_paths must be a list of strings" do
+      assert {:error, {:invalid_config, _}} = Config.build(ontology_paths: "x.json")
+      assert {:error, {:invalid_config, _}} = Config.build(ontology_paths: [:x])
+    end
+
+    test "valid modules and paths pass" do
+      assert {:ok, _} =
+               Config.build(
+                 scorer: AppointmentReferralLink.Stubs.HighScorer,
+                 text_adapter: AppointmentReferralLink.Stubs.HighText,
+                 ontology_paths: ["a.json"]
+               )
+    end
+  end
 end

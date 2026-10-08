@@ -32,7 +32,7 @@ defmodule AppointmentReferralLink do
     with :ok <- Validate.input(referral, appointments),
          {:ok, config} <- Config.build(opts),
          {:ok, config} <- Pipeline.prepare(config) do
-      {:ok, Enum.map(appointments, &Pipeline.run(referral, &1, config))}
+      {:ok, Pipeline.run_all(referral, appointments, config)}
     end
   end
 
@@ -41,7 +41,8 @@ defmodule AppointmentReferralLink do
   through the pipeline with one prepared config and reports precision,
   recall, review rate, and the cross-referral false-link rate. A false
   link is cross-referral when the same appointment is labeled true for a
-  different referral in the set. Raises `ArgumentError` on invalid config.
+  different referral in the set. Raises `ArgumentError` on invalid config
+  or a malformed row (naming the row's index).
   """
   @spec evaluate([map()], keyword()) :: Report.t()
   def evaluate(labeled, opts \\ []) when is_list(labeled) do
@@ -52,6 +53,8 @@ defmodule AppointmentReferralLink do
       else
         {:error, reason} -> raise ArgumentError, "evaluate/2: #{inspect(reason)}"
       end
+
+    validate_rows!(labeled)
 
     truth =
       for %{label: true, referral: r, appointment: a} <- labeled, reduce: %{} do
@@ -66,5 +69,24 @@ defmodule AppointmentReferralLink do
       {decision.outcome, label, cross?}
     end)
     |> Report.build()
+  end
+
+  defp validate_rows!(labeled) do
+    labeled
+    |> Enum.with_index()
+    |> Enum.each(fn
+      {%{referral: r, appointment: a, label: label}, index} when is_boolean(label) ->
+        case Validate.input(r, [a]) do
+          :ok ->
+            :ok
+
+          {:error, {:invalid_input, msg}} ->
+            raise ArgumentError, "evaluate/2: row #{index}: #{msg}"
+        end
+
+      {_row, index} ->
+        raise ArgumentError,
+              "evaluate/2: row #{index}: expected %{referral:, appointment:, label: boolean}"
+    end)
   end
 end

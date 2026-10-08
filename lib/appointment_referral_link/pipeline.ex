@@ -39,8 +39,33 @@ defmodule AppointmentReferralLink.Pipeline do
     end
   end
 
+  @doc """
+  Decides every appointment against one referral, in input order. Pairs
+  that need the text adapter are refined concurrently under a single
+  `text_timeout` deadline for the whole batch.
+  """
+  @spec run_all(Referral.t(), [Appointment.t()], Config.t()) :: [Decision.t()]
+  def run_all(%Referral{} = r, appointments, %Config{} = c) do
+    staged = Enum.map(appointments, &stage(r, &1, c))
+    refined = refine_all(for({:text, job} <- staged, do: job), c)
+
+    Enum.map(staged, fn
+      {:done, decision} -> decision
+      {:text, job} -> finish(job, Map.fetch!(refined, job.id), c)
+    end)
+  end
+
   @spec run(Referral.t(), Appointment.t(), Config.t()) :: Decision.t()
-  def run(%Referral{} = r, %Appointment{} = a, %Config{} = c) do
+  def run(%Referral{} = r, %Appointment{} = a, %Config{} = c), do: hd(run_all(r, [a], c))
+
+  defp stage(r, a, c) do
+    case gate(r, a, c) do
+      %Decision{} = decision -> {:done, decision}
+      {:text, job} -> {:text, job}
+    end
+  end
+
+  defp gate(r, a, c) do
     decision = %Decision{appointment_id: a.id, referral_id: r.id}
 
     case Gate.Patient.check(r, a, c) do
@@ -100,58 +125,103 @@ defmodule AppointmentReferralLink.Pipeline do
 
   defp text(r, a, features, p, c, comps, d) do
     if Threshold.in_band?(p, c) do
-      case call_text(r, a, features, p, c) do
-        {:ok, refined} ->
-          decide(refined, c, Map.put(comps, :text, %{before: p, after: refined}), d)
-
-        {:error, reason} ->
-          review(d, p, [:text_unavailable], Map.put(comps, :text, %{error: reason}))
-      end
+      {:text,
+       %{
+         id: make_ref(),
+         referral: r,
+         appointment: a,
+         features: features,
+         p: p,
+         comps: comps,
+         decision: d
+       }}
     else
       decide(p, c, comps, d)
     end
   end
 
-  # The adapter runs in an unlinked, monitored process: a crash inside it
-  # (including one in a process it links to) becomes an error, never an
-  # exit signal or leftover message in the caller.
-  defp call_text(r, a, features, p, c) do
+  defp finish(job, {:ok, refined}, c),
+    do:
+      decide(
+        refined,
+        c,
+        Map.put(job.comps, :text, %{before: job.p, after: refined}),
+        job.decision
+      )
+
+  defp finish(job, {:error, reason}, _c),
+    do:
+      review(
+        job.decision,
+        job.p,
+        [:text_unavailable],
+        Map.put(job.comps, :text, %{error: reason})
+      )
+
+  # Each adapter call runs in its own unlinked, monitored process: a crash
+  # inside it (including one in a process it links to) becomes an error,
+  # never an exit signal or leftover message in the caller. All calls share
+  # one deadline, so a slow adapter costs about one `text_timeout` per
+  # batch rather than one per pair.
+  defp refine_all([], _c), do: %{}
+
+  defp refine_all(jobs, c) do
     parent = self()
-    ref = make_ref()
 
-    {pid, monitor} =
-      spawn_monitor(fn ->
-        result =
-          try do
-            c.text_adapter.refine(r, a, features, p, c)
-          rescue
-            e -> {:error, {:exception, Exception.message(e)}}
-          catch
-            kind, value -> {:error, {kind, value}}
-          end
-
-        send(parent, {ref, result})
+    workers =
+      Map.new(jobs, fn job ->
+        ref = make_ref()
+        {pid, monitor} = spawn_monitor(fn -> send(parent, {ref, call_adapter(job, c)}) end)
+        {ref, %{job_id: job.id, pid: pid, monitor: monitor}}
       end)
 
+    monitors = Map.new(workers, fn {ref, w} -> {w.monitor, ref} end)
+    collect(workers, monitors, System.monotonic_time(:millisecond) + c.text_timeout, %{})
+  end
+
+  defp call_adapter(job, c) do
+    c.text_adapter.refine(job.referral, job.appointment, job.features, job.p, c)
+  rescue
+    e -> {:error, {:exception, Exception.message(e)}}
+  catch
+    kind, value -> {:error, {kind, value}}
+  end
+
+  defp collect(workers, _monitors, _deadline, acc) when map_size(workers) == 0, do: acc
+
+  defp collect(workers, monitors, deadline, acc) do
+    remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
     receive do
-      {^ref, result} ->
-        Process.demonitor(monitor, [:flush])
-        text_result(result)
+      {ref, result} when is_map_key(workers, ref) ->
+        {w, workers} = Map.pop!(workers, ref)
+        Process.demonitor(w.monitor, [:flush])
 
-      {:DOWN, ^monitor, :process, ^pid, reason} ->
-        {:error, {:exit, reason}}
+        collect(
+          workers,
+          Map.delete(monitors, w.monitor),
+          deadline,
+          Map.put(acc, w.job_id, text_result(result))
+        )
+
+      {:DOWN, monitor, :process, _pid, reason} when is_map_key(monitors, monitor) ->
+        {ref, monitors} = Map.pop!(monitors, monitor)
+        {w, workers} = Map.pop!(workers, ref)
+        collect(workers, monitors, deadline, Map.put(acc, w.job_id, {:error, {:exit, reason}}))
     after
-      c.text_timeout ->
-        Process.exit(pid, :kill)
-        Process.demonitor(monitor, [:flush])
+      remaining ->
+        Enum.reduce(workers, acc, fn {ref, w}, acc ->
+          Process.exit(w.pid, :kill)
+          Process.demonitor(w.monitor, [:flush])
 
-        receive do
-          {^ref, _late} -> :ok
-        after
-          0 -> :ok
-        end
+          receive do
+            {^ref, _late} -> :ok
+          after
+            0 -> :ok
+          end
 
-        {:error, :timeout}
+          Map.put(acc, w.job_id, {:error, :timeout})
+        end)
     end
   end
 
@@ -172,11 +242,16 @@ defmodule AppointmentReferralLink.Pipeline do
   defp load_fs(:exact), do: {:ok, nil}
   defp load_fs({:fellegi_sunter, model}), do: FellegiSunter.load(model)
 
+  # Config.build/1 has already checked that the scorer implements init/1.
   defp init_scorer(%Config{scorer: scorer} = c) do
-    if Code.ensure_loaded?(scorer) and function_exported?(scorer, :init, 1) do
-      scorer.init(c)
-    else
-      {:error, {:scorer, "#{inspect(scorer)} does not implement AppointmentReferralLink.Score"}}
+    case scorer.init(c) do
+      {:ok, state} -> {:ok, state}
+      {:error, reason} -> {:error, reason}
+      other -> {:error, {:scorer, {:bad_init, other}}}
     end
+  rescue
+    e -> {:error, {:scorer, {:exception, Exception.message(e)}}}
+  catch
+    kind, value -> {:error, {:scorer, {kind, value}}}
   end
 end

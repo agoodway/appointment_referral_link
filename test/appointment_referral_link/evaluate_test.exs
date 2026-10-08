@@ -67,4 +67,28 @@ defmodule AppointmentReferralLink.EvaluateTest do
       AppointmentReferralLink.evaluate(labeled, reject_at: 2.0)
     end
   end
+
+  describe "evaluate/2 validates rows" do
+    test "a row with a malformed field raises ArgumentError naming the row" do
+      labeled = [
+        %{referral: referral(), appointment: appointment(), label: true},
+        %{referral: referral(), appointment: appointment(status: "cancelled"), label: false}
+      ]
+
+      error = assert_raise ArgumentError, fn -> AppointmentReferralLink.evaluate(labeled) end
+      assert error.message =~ "row 1"
+    end
+
+    test "a row of the wrong shape or with a non-boolean label raises ArgumentError" do
+      assert_raise ArgumentError, fn ->
+        AppointmentReferralLink.evaluate([%{referral: referral()}])
+      end
+
+      assert_raise ArgumentError, fn ->
+        AppointmentReferralLink.evaluate([
+          %{referral: referral(), appointment: appointment(), label: "yes"}
+        ])
+      end
+    end
+  end
 end

@@ -105,4 +105,32 @@ defmodule AppointmentReferralLink.Stubs do
       {:ok, 0.99}
     end
   end
+
+  defmodule BareInitScorer do
+    @moduledoc false
+    def init(_config), do: :ok
+    def score(_features, _state), do: {:ok, 0.5, %{}}
+  end
+
+  defmodule RaisingInitScorer do
+    @moduledoc false
+    def init(_config), do: raise("init down")
+    def score(_features, _state), do: {:ok, 0.5, %{}}
+  end
+
+  defmodule ThrowingInitScorer do
+    @moduledoc false
+    def init(_config), do: throw(:init_down)
+    def score(_features, _state), do: {:ok, 0.5, %{}}
+  end
+
+  defmodule SleepText do
+    @moduledoc false
+    @behaviour AppointmentReferralLink.Score.Text
+    @impl true
+    def refine(_r, _a, _f, _p, _c) do
+      Process.sleep(150)
+      {:ok, 0.99}
+    end
+  end
 end

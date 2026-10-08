@@ -114,4 +114,57 @@ defmodule AppointmentReferralLinkTest do
       assert d.reasons == [:text_unavailable]
     end
   end
+
+  describe "scorer init/1 failures are errors, never leaked or raised" do
+    for scorer <- [Stubs.BareInitScorer, Stubs.RaisingInitScorer, Stubs.ThrowingInitScorer] do
+      test "#{inspect(scorer)}" do
+        assert {:error, {:scorer, _}} =
+                 AppointmentReferralLink.link(referral(), [appointment()],
+                   scorer: unquote(scorer)
+                 )
+      end
+    end
+  end
+
+  describe "text adapter calls run concurrently under one batch deadline" do
+    test "slow adapter calls overlap instead of adding up" do
+      appts = for i <- 1..6, do: appointment(id: "a#{i}")
+      opts = @band ++ [text_adapter: Stubs.SleepText, text_timeout: 500]
+
+      {micros, {:ok, decisions}} =
+        :timer.tc(fn -> AppointmentReferralLink.link(referral(), appts, opts) end)
+
+      assert Enum.all?(decisions, &(&1.outcome == :link))
+      # Sequentially this is 6 x 150ms = 900ms.
+      assert micros < 500_000
+    end
+
+    test "the batch waits at most about one text_timeout, then sends the rest to review" do
+      appts = for i <- 1..5, do: appointment(id: "a#{i}")
+      opts = @band ++ [text_adapter: Stubs.SlowText, text_timeout: 100]
+
+      {micros, {:ok, decisions}} =
+        :timer.tc(fn -> AppointmentReferralLink.link(referral(), appts, opts) end)
+
+      assert Enum.all?(decisions, &({&1.outcome, &1.reasons} == {:review, [:text_unavailable]}))
+      assert micros < 400_000
+      assert Enum.map(decisions, & &1.appointment_id) == ~w(a1 a2 a3 a4 a5)
+    end
+
+    test "results stay in input order when gated and text pairs are mixed" do
+      appts = [
+        appointment(id: "t1"),
+        appointment(id: "g1", status: :cancelled),
+        appointment(id: "t2")
+      ]
+
+      {:ok, decisions} =
+        AppointmentReferralLink.link(referral(), appts, @band ++ [text_adapter: Stubs.LowText])
+
+      assert Enum.map(decisions, &{&1.appointment_id, &1.outcome}) ==
+               [{"t1", :reject}, {"g1", :reject}, {"t2", :reject}]
+
+      assert Enum.map(decisions, & &1.reasons) == [[:score], [:status_excluded], [:score]]
+    end
+  end
 end

@@ -86,6 +86,15 @@ defmodule AppointmentReferralLink.Config do
       not (is_list(c.conflict_reasons) and Enum.all?(c.conflict_reasons, &is_atom/1)) ->
         error("conflict_reasons must be a list of atoms")
 
+      not implements?(c.scorer, init: 1, score: 2) ->
+        error("scorer must be a module implementing AppointmentReferralLink.Score")
+
+      not implements?(c.text_adapter, refine: 5) ->
+        error("text_adapter must be a module implementing AppointmentReferralLink.Score.Text")
+
+      not (is_list(c.ontology_paths) and Enum.all?(c.ontology_paths, &is_binary/1)) ->
+        error("ontology_paths must be a list of file paths")
+
       true ->
         {:ok, c}
     end
@@ -93,6 +102,13 @@ defmodule AppointmentReferralLink.Config do
 
   defp prob?(x), do: is_number(x) and x >= 0 and x <= 1
   defp non_neg_int?(x), do: is_integer(x) and x >= 0
+
+  defp implements?(module, functions) when is_atom(module) and not is_nil(module) do
+    Code.ensure_loaded?(module) and
+      Enum.all?(functions, fn {name, arity} -> function_exported?(module, name, arity) end)
+  end
+
+  defp implements?(_module, _functions), do: false
 
   defp valid_gate?(:exact), do: true
   defp valid_gate?({:fellegi_sunter, model}) when not is_nil(model), do: true

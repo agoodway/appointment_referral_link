@@ -7,7 +7,9 @@ if Code.ensure_loaded?(Ortex) do
     The model must take one float32 input of shape `{n, columns}` and
     return `{label, probabilities}` with probabilities `{n, 2}`. For
     scikit-learn, export with `skl2onnx` and `options={"zipmap": False}`.
-    The model is loaded once per path and cached in `:persistent_term`.
+    The loaded model is cached in `:persistent_term` per path and reloaded
+    when the file's modification time or size changes, so a model replaced
+    in place is picked up by the next `link/3` call.
     """
 
     @behaviour AppointmentReferralLink.Score
@@ -38,18 +40,20 @@ if Code.ensure_loaded?(Ortex) do
     defp model(path) do
       key = {__MODULE__, path}
 
-      case :persistent_term.get(key, nil) do
-        nil ->
-          if File.exists?(path) do
-            model = Ortex.load(path)
-            :persistent_term.put(key, model)
-            {:ok, model}
-          else
-            {:error, {:tree_model, path, :enoent}}
-          end
+      with {:ok, %File.Stat{mtime: mtime, size: size}} <- File.stat(path, time: :posix) do
+        stamp = {mtime, size}
 
-        model ->
-          {:ok, model}
+        case :persistent_term.get(key, nil) do
+          {^stamp, model} ->
+            {:ok, model}
+
+          _stale_or_missing ->
+            model = Ortex.load(path)
+            :persistent_term.put(key, {stamp, model})
+            {:ok, model}
+        end
+      else
+        {:error, reason} -> {:error, {:tree_model, path, reason}}
       end
     rescue
       e -> {:error, {:tree_model, path, Exception.message(e)}}
