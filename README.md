@@ -68,6 +68,76 @@ Failures are returned, never raised: a missing key is
 rules. A stored score ruleset needs `meta.intercept`. The host's
 `config :rule_match` settings are not used.
 
+## Per-tenant configuration
+
+The package has no notion of a tenant. Every option can be set per call,
+and each call handles one referral, so the host picks the tenant's
+options and passes them to `link/3`:
+
+| Option | Applies to | Accepts |
+|---|---|---|
+| `scorer:` | always | `Score.Rules` or `Score.Tree` |
+| `tree_model_path:`, `tree_columns_path:` | `Score.Tree` only | file paths (columns default to `linker.features.json` next to the model) |
+| `score_rules:` | `Score.Rules` only | path, `%RuleMatch.Ruleset{}`, or `{:db, key}` |
+| `conflict_rules:`, `conflict_reasons:` | always | path, struct, or `{:db, key}`; list of atoms |
+| `ontology_paths:`, `cpt_families:` | always | file paths |
+| `link_at:`, `reject_at:` | always | numbers in `[0, 1]` |
+
+```elixir
+defmodule MyApp.LinkerConfig do
+  alias AppointmentReferralLink.Score
+
+  @models "/srv/linker/models"
+
+  def for_tenant(%{id: id, scorer: :tree, model_version: v} = t) do
+    [
+      scorer: Score.Tree,
+      tree_model_path: Path.join([@models, id, v, "linker.onnx"]),
+      conflict_rules: {:db, "#{id}_conflicts"},
+      link_at: t.link_at,
+      reject_at: t.reject_at
+    ]
+  end
+
+  def for_tenant(%{id: id} = t) do
+    [
+      scorer: Score.Rules,
+      score_rules: {:db, "#{id}_score_weights"},
+      conflict_rules: {:db, "#{id}_conflicts"},
+      link_at: t.link_at,
+      reject_at: t.reject_at
+    ]
+  end
+end
+
+AppointmentReferralLink.link(referral, appointments, MyApp.LinkerConfig.for_tenant(tenant))
+```
+
+- **Give each model version its own path**, e.g.
+  `models/<tenant>/<version>/linker.onnx`.
+  - Loaded models are cached per path, so tenants never share a cache
+    entry by accident.
+  - Switching versions is a settings change, and rolling back means
+    pointing at the old path.
+  - Overwriting a file in place is detected by modification time and
+    size, but calls already running may see either version.
+- **Rulesets aren't cached.** `{:db, key}` rulesets and JSON files are
+  read on every call. To avoid that, load the `%RuleMatch.Ruleset{}` once
+  in the host, cache it, and pass the struct.
+- **There's no fallback.** A missing ruleset key or model file returns
+  `{:error, ...}` for the whole call. Pass `nil` to use the shipped rules
+  on purpose.
+- **Tune thresholds for each tenant.** Each model has its own score
+  distribution. Choose `link_at` and `reject_at` by running `evaluate/2`
+  on that tenant's held-out labels.
+- **Run the parity check on upgrades.** Each tenant's model must be
+  trained on this package's features. After upgrading the package, run
+  the parity check from
+  [docs/training-tree-model.md](docs/training-tree-model.md) against
+  every tenant's model.
+- **Small tenants can share a model.** A tenant with few labels can use a
+  shared model and override only its rules and thresholds.
+
 ## Tree model
 
 Train outside Elixir on adjudicated pairs, including hard negatives
